@@ -1,14 +1,105 @@
-/*
-Plugin Name: Last User Orders by Roles
-Description: Displays users' last order dates and allows changing roles based on order inactivity.
-Version: 1.0
-Author: Your Name
-*/
+<?php
+
+/**
+ * Plugin Name:       Last User Orders by Roles
+ * Plugin URI:        https://github.com/MrGKanev/Bulk-Order-Editor/
+ * Description:       Displays users' last order dates and allows changing roles based on order inactivity.
+ * Requires at least: 5.5
+ * Version:           0.0.1
+ * Author:            Gabriel Kanev
+ * Author URI:        https://gkanev.com
+ * License:           MIT
+ * License URI:       https://github.com/MrGKanev/Last-User-Orders-by-Roles/blob/master/LICENSE
+ * GitHub Plugin URI: https://github.com/MrGKanev/Last-User-Orders-by-Roles
+ */
 
 if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
 
-    // Function to get the date of the last order for a user
-    function get_last_order_date_for_user($user_id) {
+    add_action('admin_init', 'initialize_user_orders_by_role_settings');
+
+    function initialize_user_orders_by_role_settings()
+    {
+        add_filter('woocommerce_settings_tabs_array', 'add_user_orders_by_role_settings_tab', 50);
+        add_action('woocommerce_settings_tabs_user_orders_by_role', 'user_orders_by_role_settings_tab_content');
+        add_action('woocommerce_update_options_user_orders_by_role', 'update_user_orders_by_role_settings');
+    }
+
+    function add_user_orders_by_role_settings_tab($settings_tabs)
+    {
+        $settings_tabs['user_orders_by_role'] = __('User Orders by Role', 'text-domain');
+        return $settings_tabs;
+    }
+
+    function user_orders_by_role_settings_tab_content()
+    {
+        woocommerce_admin_fields(get_user_orders_by_role_settings());
+    }
+
+    function get_user_orders_by_role_settings()
+    {
+        $roles_options = wp_list_pluck(get_editable_roles(), 'name');
+
+        $settings = array(
+            'section_title' => array(
+                'name' => __('User Orders by Role Settings', 'text-domain'),
+                'type' => 'title',
+                'desc' => '',
+                'id' => 'user_orders_by_role_section_title'
+            ),
+            'months_difference' => array(
+                'name' => __('Months Difference', 'text-domain'),
+                'type' => 'number',
+                'desc' => __('Number of months to check for order inactivity.', 'text-domain'),
+                'id' => 'user_orders_by_role_months_difference',
+                'default' => '4',
+                'desc_tip' => true,
+            ),
+            'default_role' => array(
+                'name' => __('Default Role', 'text-domain'),
+                'type' => 'select',
+                'desc' => __('Default role to set for inactive users.', 'text-domain'),
+                'id' => 'user_orders_by_role_default_role',
+                'options' => $roles_options,
+                'default' => 'customer',
+                'desc_tip' => true,
+            ),
+            'users_per_page' => array(
+                'name' => __('Users Per Page', 'text-domain'),
+                'type' => 'number',
+                'desc' => __('Number of users to display per page in the admin list.', 'text-domain'),
+                'id' => 'user_orders_by_role_users_per_page',
+                'default' => '25',
+                'desc_tip' => true,
+            ),
+            'section_end' => array(
+                'type' => 'sectionend',
+                'id' => 'user_orders_by_role_section_end'
+            )
+        );
+        return $settings;
+    }
+
+    function update_user_orders_by_role_settings()
+    {
+        woocommerce_update_options(get_user_orders_by_role_settings());
+    }
+
+    // Function to add a submenu page under WooCommerce
+    function add_user_orders_by_role_menu()
+    {
+        add_submenu_page(
+            'woocommerce',
+            'User Orders by Role',
+            'User Orders by Role',
+            'manage_woocommerce',
+            'user-orders-by-role',
+            'user_orders_by_role_page_content'
+        );
+    }
+    add_action('admin_menu', 'add_user_orders_by_role_menu');
+
+    function get_last_order_date_for_user($user_id)
+    {
         $args = array(
             'customer_id' => $user_id,
             'limit' => 1,
@@ -23,34 +114,8 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
             $order = wc_get_order($order_id);
             return $order->get_date_created()->date('Y-m-d H:i:s');
         }
-
         return 'No orders';
     }
-
-    // Function to add a submenu page under WooCommerce
-    function add_user_orders_by_role_menu() {
-        add_submenu_page(
-            'woocommerce',
-            'User Orders by Role',
-            'User Orders by Role',
-            'manage_woocommerce',
-            'user-orders-by-role',
-            'user_orders_by_role_page_content'
-        );
-    }
-    add_action('admin_menu', 'add_user_orders_by_role_menu');
-
-    // Function to add settings page
-    function add_user_orders_by_role_settings_page() {
-        add_options_page(
-            'User Orders by Role Settings',
-            'User Orders by Role Settings',
-            'manage_options',
-            'user-orders-by-role-settings',
-            'user_orders_by_role_settings_page_content'
-        );
-    }
-    add_action('admin_menu', 'add_user_orders_by_role_settings_page');
 
     // Function to register settings
     function register_user_orders_by_role_settings() {
@@ -74,7 +139,7 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 
     // Callback function for default_role
     function default_role_callback() {
-        $value = get_option('default_role', 'customer');
+        $value = get_option('default_role', 'Customer');
         $roles = get_editable_roles();
         echo '<select id="default_role" name="default_role">';
         foreach ($roles as $role_key => $role) {
@@ -153,7 +218,7 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 
         echo '<div class="wrap">';
         echo '<h1>User Orders by Role</h1>';
-        echo '<a href="' . esc_url(admin_url('options-general.php?page=user-orders-by-role-settings')) . '" class="page-title-action">Settings</a>';
+        echo '<a href="' . esc_url(admin_url('admin.php?page=wc-settings&tab=user_orders_by_role')) . '" class="page-title-action">Settings</a>';
         echo '<form method="get">';
         echo '<input type="hidden" name="page" value="user-orders-by-role" />';
         echo '<select name="role">';
