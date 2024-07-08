@@ -15,6 +15,24 @@
 
 if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
 
+    function get_last_order_date_for_user($user_id)
+    {
+        $args = array(
+            'customer_id' => $user_id,
+            'limit' => 1,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'return' => 'ids',
+        );
+
+        $orders = wc_get_orders($args);
+        if (!empty($orders)) {
+            $order_id = $orders[0];
+            $order = wc_get_order($order_id);
+            return $order->get_date_created()->date('Y-m-d H:i:s');
+        }
+        return 'No orders';
+    }
     add_action('admin_init', 'initialize_user_orders_by_role_settings');
 
     function initialize_user_orders_by_role_settings()
@@ -81,7 +99,9 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 
     function update_user_orders_by_role_settings()
     {
+        error_log('Before update: ' . print_r(get_option('user_orders_by_role_months_difference'), true));
         woocommerce_update_options(get_user_orders_by_role_settings());
+        error_log('After update: ' . print_r(get_option('user_orders_by_role_months_difference'), true));
     }
 
     // Function to add a submenu page under WooCommerce
@@ -97,25 +117,6 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
         );
     }
     add_action('admin_menu', 'add_user_orders_by_role_menu');
-
-    function get_last_order_date_for_user($user_id)
-    {
-        $args = array(
-            'customer_id' => $user_id,
-            'limit' => 1,
-            'orderby' => 'date',
-            'order' => 'DESC',
-            'return' => 'ids',
-        );
-
-        $orders = wc_get_orders($args);
-        if (!empty($orders)) {
-            $order_id = $orders[0];
-            $order = wc_get_order($order_id);
-            return $order->get_date_created()->date('Y-m-d H:i:s');
-        }
-        return 'No orders';
-    }
 
     // Function to register settings
     function register_user_orders_by_role_settings() {
