@@ -15,6 +15,17 @@
 
 if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
 
+
+    # Add settings link to plugin page
+    function user_orders_by_role_plugin_action_links($links)
+    {
+        $settings_link = '<a href="' . admin_url('admin.php?page=wc-settings&tab=user_orders_by_role') . '">Settings</a>';
+        array_unshift($links, $settings_link);
+        return $links;
+    }
+
+    add_filter('plugin_action_links_last-user-orders-by-roles/last-user-orders-by-roles.php', 'user_orders_by_role_plugin_action_links');
+
     function get_last_order_date_for_user($user_id)
     {
         $args = array(
