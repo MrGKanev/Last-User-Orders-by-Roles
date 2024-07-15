@@ -298,4 +298,18 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 
         echo '</div>';
     }
+} else {
+// Display an admin notice if WooCommerce is not active
+    function your_plugin_woocommerce_inactive_notice() {
+        echo '<div class="notice notice-error is-dismissible">
+            <p>"Last User Orders by Roles" requires WooCommerce to be active. Please activate WooCommerce first.</p>
+        </div>';
+    }
+    add_action( 'admin_notices', 'your_plugin_woocommerce_inactive_notice' );
+
+    // Deactivate the plugin
+    function your_plugin_deactivate_self() {
+        deactivate_plugins( plugin_basename( __FILE__ ) );
+    }
+    add_action( 'admin_init', 'your_plugin_deactivate_self' );
 }
