@@ -1,16 +1,17 @@
 <?php
 
 /**
- * Plugin Name:       Last User Orders by Roles
- * Plugin URI:        https://github.com/MrGKanev/Bulk-Order-Editor/
- * Description:       Displays users' last order dates and allows changing roles based on order inactivity.
- * Requires at least: 5.5
- * Version:           0.0.1
- * Author:            Gabriel Kanev
- * Author URI:        https://gkanev.com
- * License:           MIT
- * License URI:       https://github.com/MrGKanev/Last-User-Orders-by-Roles/blob/master/LICENSE
- * GitHub Plugin URI: https://github.com/MrGKanev/Last-User-Orders-by-Roles
+ * Plugin Name:             Last User Orders by Roles
+ * Plugin URI:              https://github.com/MrGKanev/Bulk-Order-Editor/
+ * Description:             Displays users' last order dates and allows changing roles based on order inactivity.
+ * Version:                 0.0.2
+ * Author:                  Gabriel Kanev
+ * Author URI:              https://gkanev.com
+ * License:                 MIT
+ * Requires at least:       6.4
+ * Requires PHP:            7.4
+ * WC requires at least:    6.0
+ * WC tested up to:         9.1.2
  */
 
 if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
