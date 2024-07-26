@@ -164,7 +164,8 @@ class Last_User_Orders_By_Roles
         $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
 
         if (isset($_POST['export_csv']) && check_admin_referer('export_csv_action', 'export_csv_nonce')) {
-            $this->export_csv($selected_role);
+            $this->export_csv($_POST['role']);
+            return; // Exit after export to prevent further output
         }
 
         $users = $this->get_users($selected_role, $users_per_page, $paged);
@@ -219,14 +220,26 @@ class Last_User_Orders_By_Roles
         $filename = 'user_orders_by_role_' . date('YmdHis') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename=' . $filename);
+
         $output = fopen('php://output', 'w');
+
+        // Output the CSV header
         fputcsv($output, array('User', 'Email', 'Last Order Date'));
 
-        $users = get_users(array('role' => $role));
+        $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $users_per_page = get_option('user_orders_by_role_users_per_page', 25);
+
+        $users = get_users(array(
+            'role' => $role,
+            'number' => $users_per_page,
+            'paged' => $paged,
+        ));
+
         foreach ($users as $user) {
             $last_order_date = $this->get_last_order_date($user->ID);
             fputcsv($output, array($user->display_name, $user->user_email, $last_order_date));
         }
+
         fclose($output);
         exit;
     }

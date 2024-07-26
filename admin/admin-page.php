@@ -17,9 +17,11 @@
     </form>
 
     <?php if ($selected_role) : ?>
-        <form method="post" style="margin-top: 10px;">
+        <form method="post" class="export-form">
             <?php wp_nonce_field('export_csv_action', 'export_csv_nonce'); ?>
             <input type="hidden" name="export_csv" value="1">
+            <input type="hidden" name="paged" value="<?php echo $paged; ?>">
+            <input type="hidden" name="role" value="<?php echo esc_attr($selected_role); ?>">
             <?php submit_button('Export CSV', 'secondary', 'submit', false); ?>
         </form>
 
