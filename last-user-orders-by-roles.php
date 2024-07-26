@@ -1,123 +1,64 @@
 <?php
 
 /**
- * Plugin Name:             Last User Orders by Roles
- * Plugin URI:              https://github.com/MrGKanev/Bulk-Order-Editor/
- * Description:             Displays users' last order dates and allows changing roles based on order inactivity.
- * Version:                 0.0.2
- * Author:                  Gabriel Kanev
- * Author URI:              https://gkanev.com
- * License:                 MIT
- * Requires at least:       6.4
- * Requires PHP:            7.4
- * WC requires at least:    6.0
- * WC tested up to:         9.1.2
+ * Plugin Name: Last User Orders by Roles
+ * Plugin URI: https://github.com/MrGKanev/Bulk-Order-Editor/
+ * Description: Displays users' last order dates and allows changing roles based on order inactivity.
+ * Version: 0.0.3
+ * Author: Gabriel Kanev
+ * Author URI: https://gkanev.com
+ * License: MIT
+ * Requires at least: 6.4
+ * Requires PHP: 7.4
+ * WC requires at least: 6.0
+ * WC tested up to: 9.1.2
  */
 
-if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option('active_plugins')))) {
+defined('ABSPATH') || exit;
 
+class Last_User_Orders_By_Roles
+{
+    public function __construct()
+    {
+        add_action('plugins_loaded', array($this, 'init'));
+        $this->initialize_settings();
+    }
 
-    # Add settings link to plugin page
-    function user_orders_by_role_plugin_action_links($links)
+    public function init()
+    {
+        if (!class_exists('WooCommerce')) {
+            add_action('admin_notices', array($this, 'woocommerce_inactive_notice'));
+            return;
+        }
+
+        add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_plugin_action_links'));
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_init', array($this, 'handle_user_role_change'));
+        add_filter('woocommerce_settings_tabs_array', array($this, 'add_settings_tab'), 50);
+        add_action('woocommerce_settings_tabs_user_orders_by_role', array($this, 'settings_tab_content'));
+        add_action('woocommerce_update_options_user_orders_by_role', array($this, 'update_settings'));
+
+        // HPOS compatibility
+        add_action('before_woocommerce_init', function () {
+            if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
+                \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
+            }
+        });
+    }
+
+    public function woocommerce_inactive_notice()
+    {
+        echo '<div class="notice notice-error is-dismissible"><p>"Last User Orders by Roles" requires WooCommerce to be active. Please activate WooCommerce first.</p></div>';
+    }
+
+    public function add_plugin_action_links($links)
     {
         $settings_link = '<a href="' . admin_url('admin.php?page=wc-settings&tab=user_orders_by_role') . '">Settings</a>';
         array_unshift($links, $settings_link);
         return $links;
     }
 
-    add_filter('plugin_action_links_last-user-orders-by-roles/last-user-orders-by-roles.php', 'user_orders_by_role_plugin_action_links');
-
-    function get_last_order_date_for_user($user_id)
-    {
-        $args = array(
-            'customer_id' => $user_id,
-            'limit' => 1,
-            'orderby' => 'date',
-            'order' => 'DESC',
-            'return' => 'ids',
-        );
-
-        $orders = wc_get_orders($args);
-        if (!empty($orders)) {
-            $order_id = $orders[0];
-            $order = wc_get_order($order_id);
-            return $order->get_date_created()->date('Y-m-d H:i:s');
-        }
-        return 'No orders';
-    }
-    add_action('admin_init', 'initialize_user_orders_by_role_settings');
-
-    function initialize_user_orders_by_role_settings()
-    {
-        add_filter('woocommerce_settings_tabs_array', 'add_user_orders_by_role_settings_tab', 50);
-        add_action('woocommerce_settings_tabs_user_orders_by_role', 'user_orders_by_role_settings_tab_content');
-        add_action('woocommerce_update_options_user_orders_by_role', 'update_user_orders_by_role_settings');
-    }
-
-    function add_user_orders_by_role_settings_tab($settings_tabs)
-    {
-        $settings_tabs['user_orders_by_role'] = __('User Orders by Role', 'text-domain');
-        return $settings_tabs;
-    }
-
-    function user_orders_by_role_settings_tab_content()
-    {
-        woocommerce_admin_fields(get_user_orders_by_role_settings());
-    }
-
-    function get_user_orders_by_role_settings()
-    {
-        $roles_options = wp_list_pluck(get_editable_roles(), 'name');
-
-        $settings = array(
-            'section_title' => array(
-                'name' => __('User Orders by Role Settings', 'text-domain'),
-                'type' => 'title',
-                'desc' => '',
-                'id' => 'user_orders_by_role_section_title'
-            ),
-            'months_difference' => array(
-                'name' => __('Months Difference', 'text-domain'),
-                'type' => 'number',
-                'desc' => __('Number of months to check for order inactivity.', 'text-domain'),
-                'id' => 'user_orders_by_role_months_difference',
-                'default' => '4',
-                'desc_tip' => true,
-            ),
-            'default_role' => array(
-                'name' => __('Default Role', 'text-domain'),
-                'type' => 'select',
-                'desc' => __('Default role to set for inactive users.', 'text-domain'),
-                'id' => 'user_orders_by_role_default_role',
-                'options' => $roles_options,
-                'default' => 'customer',
-                'desc_tip' => true,
-            ),
-            'users_per_page' => array(
-                'name' => __('Users Per Page', 'text-domain'),
-                'type' => 'number',
-                'desc' => __('Number of users to display per page in the admin list.', 'text-domain'),
-                'id' => 'user_orders_by_role_users_per_page',
-                'default' => '25',
-                'desc_tip' => true,
-            ),
-            'section_end' => array(
-                'type' => 'sectionend',
-                'id' => 'user_orders_by_role_section_end'
-            )
-        );
-        return $settings;
-    }
-
-    function update_user_orders_by_role_settings()
-    {
-        error_log('Before update: ' . print_r(get_option('user_orders_by_role_months_difference'), true));
-        woocommerce_update_options(get_user_orders_by_role_settings());
-        error_log('After update: ' . print_r(get_option('user_orders_by_role_months_difference'), true));
-    }
-
-    // Function to add a submenu page under WooCommerce
-    function add_user_orders_by_role_menu()
+    public function add_admin_menu()
     {
         add_submenu_page(
             'woocommerce',
@@ -125,191 +66,170 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
             'User Orders by Role',
             'manage_woocommerce',
             'user-orders-by-role',
-            'user_orders_by_role_page_content'
+            array($this, 'render_admin_page')
         );
     }
-    add_action('admin_menu', 'add_user_orders_by_role_menu');
 
-    // Function to register settings
-    function register_user_orders_by_role_settings() {
-        register_setting('user_orders_by_role_settings_group', 'months_difference');
-        register_setting('user_orders_by_role_settings_group', 'default_role');
-        register_setting('user_orders_by_role_settings_group', 'users_per_page');
-
-        add_settings_section('user_orders_by_role_main_section', 'Main Settings', null, 'user-orders-by-role-settings');
-
-        add_settings_field('months_difference', 'Months Difference', 'months_difference_callback', 'user-orders-by-role-settings', 'user_orders_by_role_main_section');
-        add_settings_field('default_role', 'Default Role', 'default_role_callback', 'user-orders-by-role-settings', 'user_orders_by_role_main_section');
-        add_settings_field('users_per_page', 'Users Per Page', 'users_per_page_callback', 'user-orders-by-role-settings', 'user_orders_by_role_main_section');
-    }
-    add_action('admin_init', 'register_user_orders_by_role_settings');
-
-    // Callback function for months_difference
-    function months_difference_callback() {
-        $value = get_option('months_difference', 4);
-        echo '<input type="number" id="months_difference" name="months_difference" value="' . esc_attr($value) . '" />';
+    public function initialize_settings()
+    {
+        add_filter('woocommerce_settings_tabs_array', array($this, 'add_settings_tab'), 50);
+        add_action('woocommerce_settings_tabs_user_orders_by_role', array($this, 'settings_tab_content'));
+        add_action('woocommerce_update_options_user_orders_by_role', array($this, 'update_settings'));
     }
 
-    // Callback function for default_role
-    function default_role_callback() {
-        $value = get_option('default_role', 'Customer');
-        $roles = get_editable_roles();
-        echo '<select id="default_role" name="default_role">';
-        foreach ($roles as $role_key => $role) {
-            echo '<option value="' . esc_attr($role_key) . '" ' . selected($value, $role_key, false) . '>' . esc_html($role['name']) . '</option>';
+    public function months_difference_callback()
+    {
+        $value = get_option('user_orders_by_role_months_difference', 4);
+        echo '<input type="number" id="user_orders_by_role_months_difference" name="user_orders_by_role_months_difference" value="' . esc_attr($value) . '" />';
+    }
+
+    public function default_role_callback()
+    {
+        $value = get_option('user_orders_by_role_default_role', 'customer');
+        $roles = wp_roles()->get_names();
+        echo '<select id="user_orders_by_role_default_role" name="user_orders_by_role_default_role">';
+        foreach ($roles as $role_key => $role_name) {
+            echo '<option value="' . esc_attr($role_key) . '" ' . selected($value, $role_key, false) . '>' . esc_html($role_name) . '</option>';
         }
         echo '</select>';
     }
 
-    // Callback function for users_per_page
-    function users_per_page_callback() {
-        $value = get_option('users_per_page', 25);
-        echo '<input type="number" id="users_per_page" name="users_per_page" value="' . esc_attr($value) . '" />';
+    public function users_per_page_callback()
+    {
+        $value = get_option('user_orders_by_role_users_per_page', 25);
+        echo '<input type="number" id="user_orders_by_role_users_per_page" name="user_orders_by_role_users_per_page" value="' . esc_attr($value) . '" />';
     }
 
-    // Settings page content
-    function user_orders_by_role_settings_page_content() {
-        ?>
-        <div class="wrap">
-            <h1>User Orders by Role Settings</h1>
-            <form method="post" action="options.php">
-                <?php
-                settings_fields('user_orders_by_role_settings_group');
-                do_settings_sections('user-orders-by-role-settings');
-                submit_button();
-                ?>
-            </form>
-        </div>
-        <?php
+    public function add_settings_tab($settings_tabs)
+    {
+        $settings_tabs['user_orders_by_role'] = __('User Orders by Role', 'last-user-orders-by-roles');
+        return $settings_tabs;
     }
 
-    // Function to handle CSV export
-    function handle_csv_export($users) {
+    public function settings_tab_content()
+    {
+        woocommerce_admin_fields($this->get_settings());
+    }
+
+    public function update_settings()
+    {
+        woocommerce_update_options($this->get_settings());
+    }
+
+    public function get_settings()
+    {
+        $settings = array(
+            array(
+                'title' => __('User Orders by Role Settings', 'last-user-orders-by-roles'),
+                'type'  => 'title',
+                'desc'  => '',
+                'id'    => 'user_orders_by_role_section_title'
+            ),
+            array(
+                'title'   => __('Months Difference', 'last-user-orders-by-roles'),
+                'desc'    => __('Number of months to check for order inactivity.', 'last-user-orders-by-roles'),
+                'id'      => 'user_orders_by_role_months_difference',
+                'default' => '4',
+                'type'    => 'number',
+            ),
+            array(
+                'title'   => __('Default Role', 'last-user-orders-by-roles'),
+                'desc'    => __('Default role to set for inactive users.', 'last-user-orders-by-roles'),
+                'id'      => 'user_orders_by_role_default_role',
+                'default' => 'customer',
+                'type'    => 'select',
+                'options' => wp_roles()->get_names(),
+            ),
+            array(
+                'title'   => __('Users Per Page', 'last-user-orders-by-roles'),
+                'desc'    => __('Number of users to display per page in the admin list.', 'last-user-orders-by-roles'),
+                'id'      => 'user_orders_by_role_users_per_page',
+                'default' => '25',
+                'type'    => 'number',
+            ),
+            array(
+                'type' => 'sectionend',
+                'id'   => 'user_orders_by_role_section_end'
+            )
+        );
+        return apply_filters('user_orders_by_role_settings', $settings);
+    }
+
+    public function render_admin_page()
+    {
+        $roles = wp_roles()->get_names();
+        $selected_role = isset($_GET['role']) ? sanitize_text_field($_GET['role']) : get_option('user_orders_by_role_default_role', 'customer');
+        $months_difference = get_option('user_orders_by_role_months_difference', 4);
+        $users_per_page = get_option('user_orders_by_role_users_per_page', 25);
+        $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+
+        if (isset($_POST['export_csv']) && check_admin_referer('export_csv_action', 'export_csv_nonce')) {
+            $this->export_csv($selected_role);
+        }
+
+        $users = $this->get_users($selected_role, $users_per_page, $paged);
+        $total_users = count_users()['avail_roles'][$selected_role] ?? 0;
+        $total_pages = ceil($total_users / $users_per_page);
+
+        include plugin_dir_path(__FILE__) . 'admin/admin-page.php';
+    }
+
+    private function get_users($role, $per_page, $paged)
+    {
+        return get_users(array(
+            'role' => $role,
+            'number' => $per_page,
+            'paged' => $paged,
+        ));
+    }
+
+    public function get_last_order_date($user_id)
+    {
+        $orders = wc_get_orders(array(
+            'customer' => $user_id,
+            'limit' => 1,
+            'orderby' => 'date',
+            'order' => 'DESC',
+            'return' => 'ids',
+        ));
+
+        if (!empty($orders)) {
+            $order = wc_get_order($orders[0]);
+            return $order->get_date_created()->date('Y-m-d H:i:s');
+        }
+
+        return 'No orders';
+    }
+
+    public function handle_user_role_change()
+    {
+        if (isset($_GET['change_user_role'], $_GET['user_id'], $_GET['role']) && check_admin_referer('change_user_role')) {
+            $user_id = intval($_GET['user_id']);
+            $user = get_userdata($user_id);
+            if ($user) {
+                $user->set_role('customer');
+            }
+            wp_safe_redirect(add_query_arg('role', $_GET['role'], admin_url('admin.php?page=user-orders-by-role')));
+            exit;
+        }
+    }
+
+    private function export_csv($role)
+    {
         $filename = 'user_orders_by_role_' . date('YmdHis') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename=' . $filename);
         $output = fopen('php://output', 'w');
         fputcsv($output, array('User', 'Email', 'Last Order Date'));
 
+        $users = get_users(array('role' => $role));
         foreach ($users as $user) {
-            $user_id = $user->ID;
-            $last_order_date = get_last_order_date_for_user($user_id);
+            $last_order_date = $this->get_last_order_date($user->ID);
             fputcsv($output, array($user->display_name, $user->user_email, $last_order_date));
         }
         fclose($output);
         exit;
     }
-
-    // Function to change user role to a normal WooCommerce customer
-    function change_user_role_to_customer() {
-        if (isset($_GET['change_user_role']) && isset($_GET['user_id'])) {
-            $user_id = intval($_GET['user_id']);
-            $default_role = get_option('default_role', 'customer');
-            $user = new WP_User($user_id);
-            $user->set_role($default_role);
-            wp_redirect(admin_url('admin.php?page=user-orders-by-role&role=' . $_GET['role']));
-            exit;
-        }
-    }
-    add_action('admin_init', 'change_user_role_to_customer');
-
-    // Content for the User Orders by Role page
-    function user_orders_by_role_page_content() {
-        // Check for CSV export request
-        if (isset($_POST['export_csv']) && isset($_GET['role'])) {
-            $selected_role = sanitize_text_field($_GET['role']);
-            $users = get_users(array('role' => $selected_role));
-            handle_csv_export($users); // Handle CSV export if requested
-        }
-
-        $roles = get_editable_roles();
-        $selected_role = isset($_GET['role']) ? sanitize_text_field($_GET['role']) : get_option('default_role', 'customer');
-        $months_difference = get_option('months_difference', 4);
-        $users_per_page = get_option('users_per_page', 25);
-        $paged = isset($_GET['paged']) ? intval($_GET['paged']) : 1;
-        $offset = ($paged - 1) * $users_per_page;
-
-        echo '<div class="wrap">';
-        echo '<h1>User Orders by Role</h1>';
-        echo '<a href="' . esc_url(admin_url('admin.php?page=wc-settings&tab=user_orders_by_role')) . '" class="page-title-action">Settings</a>';
-        echo '<form method="get">';
-        echo '<input type="hidden" name="page" value="user-orders-by-role" />';
-        echo '<select name="role">';
-        foreach ($roles as $role_key => $role) {
-            echo '<option value="' . esc_attr($role_key) . '" ' . selected($selected_role, $role_key, false) . '>' . esc_html($role['name']) . '</option>';
-        }
-        echo '</select>';
-        submit_button('Filter');
-        echo '</form>';
-
-        if ($selected_role) {
-            $users = get_users(array(
-                'role' => $selected_role,
-                'number' => $users_per_page,
-                'offset' => $offset,
-            ));
-            $total_users = count_users()['avail_roles'][$selected_role];
-            $total_pages = ceil($total_users / $users_per_page);
-
-            echo '<form method="post" style="margin-top: 10px;">';
-            echo '<input type="hidden" name="export_csv" value="1">';
-            submit_button('Export CSV', 'secondary', 'submit', false);
-            echo '</form>';
-
-            echo '<table class="wp-list-table widefat fixed striped users" style="margin-top: 20px;"><thead><tr><th>User</th><th>Last Order Date</th><th>Actions</th></tr></thead><tbody>';
-
-            foreach ($users as $user) {
-                $user_id = $user->ID;
-                $last_order_date = get_last_order_date_for_user($user_id);
-
-                // Check if the last order date is 'No orders' or more than defined months old
-                $row_style = '';
-                if ($last_order_date === 'No orders') {
-                    $row_style = ' style="background-color: #ffcccc;"';
-                } else {
-                    $order_date = new DateTime($last_order_date);
-                    $current_date = new DateTime();
-                    $interval = $current_date->diff($order_date);
-                    $months_diff = ($interval->y * 12) + $interval->m;
-
-                    if ($months_diff >= $months_difference) {
-                        $row_style = ' style="background-color: #ffcccc;"';
-                    }
-                }
-
-                echo '<tr' . $row_style . '>';
-                echo '<td>' . esc_html($user->display_name) . ' (' . esc_html($user->user_email) . ')</td>';
-                echo '<td>' . esc_html($last_order_date) . '</td>';
-                echo '<td><a href="' . esc_url(add_query_arg(array('change_user_role' => '1', 'user_id' => $user_id, 'role' => $selected_role))) . '">Change to ' . esc_html(get_option('default_role', 'customer')) . '</a></td>';
-                echo '</tr>';
-            }
-
-            echo '</tbody></table>';
-
-            // Pagination
-            echo '<div class="tablenav"><div class="tablenav-pages">';
-            $current_url = esc_url(admin_url('admin.php?page=user-orders-by-role&role=' . $selected_role));
-            for ($i = 1; $i <= $total_pages; $i++) {
-                $class = ($i == $paged) ? ' class="current"' : '';
-                echo '<a' . $class . ' href="' . $current_url . '&paged=' . $i . '">' . $i . '</a> ';
-            }
-            echo '</div></div>';
-        }
-
-        echo '</div>';
-    }
-} else {
-// Display an admin notice if WooCommerce is not active
-    function your_plugin_woocommerce_inactive_notice() {
-        echo '<div class="notice notice-error is-dismissible">
-            <p>"Last User Orders by Roles" requires WooCommerce to be active. Please activate WooCommerce first.</p>
-        </div>';
-    }
-    add_action( 'admin_notices', 'your_plugin_woocommerce_inactive_notice' );
-
-    // Deactivate the plugin
-    function your_plugin_deactivate_self() {
-        deactivate_plugins( plugin_basename( __FILE__ ) );
-    }
-    add_action( 'admin_init', 'your_plugin_deactivate_self' );
 }
+
+new Last_User_Orders_By_Roles();
