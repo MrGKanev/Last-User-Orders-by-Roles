@@ -2,12 +2,13 @@
 
 <div class="wrap user-orders-by-role">
     <h1 class="wp-heading-inline"><?php echo esc_html(get_admin_page_title()); ?></h1>
-    <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=user_orders_by_role')); ?>" class="page-title-action">
-        <span class="dashicons dashicons-admin-generic"></span>
-        <?php esc_html_e('Settings', 'last-user-orders-by-roles'); ?>
-    </a>
 
     <div class="user-orders-controls">
+        <a href="<?php echo esc_url(admin_url('admin.php?page=wc-settings&tab=user_orders_by_role')); ?>" class="page-title-action">
+            <span class="dashicons dashicons-admin-generic"></span>
+            <?php esc_html_e('Settings', 'last-user-orders-by-roles'); ?>
+        </a>
+
         <form method="get" class="filter-form">
             <input type="hidden" name="page" value="user-orders-by-role" />
             <select name="role" id="role-select">
