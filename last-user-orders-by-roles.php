@@ -4,7 +4,7 @@
  * Plugin Name: Last User Orders by Roles
  * Plugin URI: https://github.com/MrGKanev/Last-User-Orders-by-Roles
  * Description: Displays users' last order dates and allows changing roles based on order inactivity.
- * Version: 0.0.3
+ * Version: 0.0.4
  * Author: Gabriel Kanev
  * Author URI: https://gkanev.com
  * License: GPL-2.0 License
@@ -38,6 +38,7 @@ class Last_User_Orders_By_Roles
         add_filter('woocommerce_settings_tabs_array', array($this, 'add_settings_tab'), 50);
         add_action('woocommerce_settings_tabs_user_orders_by_role', array($this, 'settings_tab_content'));
         add_action('woocommerce_update_options_user_orders_by_role', array($this, 'update_settings'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_styles'));
 
         // HPOS compatibility
         add_action('before_woocommerce_init', function () {
@@ -76,29 +77,6 @@ class Last_User_Orders_By_Roles
         add_filter('woocommerce_settings_tabs_array', array($this, 'add_settings_tab'), 50);
         add_action('woocommerce_settings_tabs_user_orders_by_role', array($this, 'settings_tab_content'));
         add_action('woocommerce_update_options_user_orders_by_role', array($this, 'update_settings'));
-    }
-
-    public function months_difference_callback()
-    {
-        $value = get_option('user_orders_by_role_months_difference', 4);
-        echo '<input type="number" id="user_orders_by_role_months_difference" name="user_orders_by_role_months_difference" value="' . esc_attr($value) . '" />';
-    }
-
-    public function default_role_callback()
-    {
-        $value = get_option('user_orders_by_role_default_role', 'customer');
-        $roles = wp_roles()->get_names();
-        echo '<select id="user_orders_by_role_default_role" name="user_orders_by_role_default_role">';
-        foreach ($roles as $role_key => $role_name) {
-            echo '<option value="' . esc_attr($role_key) . '" ' . selected($value, $role_key, false) . '>' . esc_html($role_name) . '</option>';
-        }
-        echo '</select>';
-    }
-
-    public function users_per_page_callback()
-    {
-        $value = get_option('user_orders_by_role_users_per_page', 25);
-        echo '<input type="number" id="user_orders_by_role_users_per_page" name="user_orders_by_role_users_per_page" value="' . esc_attr($value) . '" />';
     }
 
     public function add_settings_tab($settings_tabs)
@@ -185,27 +163,6 @@ class Last_User_Orders_By_Roles
         ));
     }
 
-    private function get_user_data_for_export($role, $paged, $users_per_page)
-    {
-        $users = get_users(array(
-            'role' => $role,
-            'number' => $users_per_page,
-            'paged' => $paged,
-        ));
-
-        $data = array();
-        foreach ($users as $user) {
-            $last_order_date = $this->get_last_order_date($user->ID);
-            $data[] = array(
-                $user->display_name,
-                $user->user_email,
-                $last_order_date
-            );
-        }
-
-        return $data;
-    }
-
     public function get_last_order_date($user_id)
     {
         $orders = wc_get_orders(array(
@@ -239,18 +196,6 @@ class Last_User_Orders_By_Roles
 
     private function export_csv($role)
     {
-        ob_start(); // Start output buffering
-        $data = $this->get_user_data_for_export($role, $paged, $users_per_page);
-        $output = ob_get_clean(); // Get the output and clear the buffer
-
-        if (!empty($output)) {
-            error_log('Unexpected output before CSV: ' . $output);
-        }
-        $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-        $users_per_page = get_option('user_orders_by_role_users_per_page', 25);
-
-        $data = $this->get_user_data_for_export($role, $paged, $users_per_page);
-
         $filename = 'user_orders_by_role_' . date('YmdHis') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename=' . $filename);
@@ -262,13 +207,38 @@ class Last_User_Orders_By_Roles
         // Output the CSV header
         fputcsv($output, array('User', 'Email', 'Last Order Date'));
 
-        // Output the data
-        foreach ($data as $row) {
-            fputcsv($output, $row);
-        }
+        $paged = 1;
+        $users_per_page = 100; // Adjust this value based on your server's capabilities
+
+        do {
+            $users = get_users(array(
+                'role' => $role,
+                'number' => $users_per_page,
+                'paged' => $paged,
+            ));
+
+            foreach ($users as $user) {
+                $last_order_date = $this->get_last_order_date($user->ID);
+                fputcsv($output, array(
+                    $user->display_name,
+                    $user->user_email,
+                    $last_order_date
+                ));
+            }
+
+            $paged++;
+        } while (count($users) === $users_per_page);
 
         fclose($output);
         exit;
+    }
+
+    public function enqueue_admin_styles($hook)
+    {
+        if ('woocommerce_page_user-orders-by-role' !== $hook) {
+            return;
+        }
+        wp_enqueue_style('last-user-orders-by-roles-admin', plugin_dir_url(__FILE__) . 'admin-styles.css', array(), '0.0.4');
     }
 }
 

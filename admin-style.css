@@ -1,0 +1,116 @@
+.user-orders-by-role {
+  max-width: 1200px;
+  margin: 20px auto;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.user-orders-by-role .wp-heading-inline {
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.user-orders-by-role .page-title-action {
+  top: -3px;
+  margin-left: 10px;
+  position: relative;
+}
+
+.user-orders-by-role .page-title-action .dashicons {
+  font-size: 1.2em;
+  vertical-align: text-bottom;
+  margin-right: 5px;
+}
+
+.user-orders-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+  padding: 15px;
+  background-color: #f0f0f1;
+  border: 1px solid #ccd0d4;
+  border-radius: 4px;
+}
+
+.filter-form {
+  display: flex;
+  align-items: center;
+}
+
+#role-select {
+  margin-right: 10px;
+  min-width: 200px;
+}
+
+.export-form {
+  margin-left: auto;
+}
+
+#export-csv-button {
+  background-color: #2271b1;
+  color: #fff;
+  border-color: #2271b1;
+}
+
+#export-csv-button:hover {
+  background-color: #135e96;
+  border-color: #135e96;
+}
+
+.no-users-message {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f0f0f1;
+  border-left: 4px solid #646970;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+}
+
+.no-users-message p {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.wp-list-table {
+  border: 1px solid #ccd0d4;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, .04);
+  margin-top: 20px;
+}
+
+.wp-list-table th {
+  font-weight: 600;
+}
+
+.wp-list-table .inactive-user {
+  background-color: #ffcccc;
+}
+
+.change-role-button {
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+.tablenav-pages {
+  float: right;
+  margin: 1em 0;
+}
+
+@media screen and (max-width: 782px) {
+  .user-orders-controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-form,
+  .export-form {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  #role-select {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+}
