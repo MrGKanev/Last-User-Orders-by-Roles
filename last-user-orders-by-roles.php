@@ -2,16 +2,17 @@
 
 /**
  * Plugin Name: Last User Orders by Roles
- * Plugin URI: https://github.com/MrGKanev/Bulk-Order-Editor/
+ * Plugin URI: https://github.com/MrGKanev/Last-User-Orders-by-Roles
  * Description: Displays users' last order dates and allows changing roles based on order inactivity.
  * Version: 0.0.3
  * Author: Gabriel Kanev
  * Author URI: https://gkanev.com
- * License: MIT
+ * License: GPL-2.0 License
+ * Requires Plugins: woocommerce
  * Requires at least: 6.4
  * Requires PHP: 7.4
  * WC requires at least: 6.0
- * WC tested up to: 9.1.2
+ * WC tested up to: 9.2.1
  */
 
 defined('ABSPATH') || exit;
@@ -184,6 +185,27 @@ class Last_User_Orders_By_Roles
         ));
     }
 
+    private function get_user_data_for_export($role, $paged, $users_per_page)
+    {
+        $users = get_users(array(
+            'role' => $role,
+            'number' => $users_per_page,
+            'paged' => $paged,
+        ));
+
+        $data = array();
+        foreach ($users as $user) {
+            $last_order_date = $this->get_last_order_date($user->ID);
+            $data[] = array(
+                $user->display_name,
+                $user->user_email,
+                $last_order_date
+            );
+        }
+
+        return $data;
+    }
+
     public function get_last_order_date($user_id)
     {
         $orders = wc_get_orders(array(
@@ -217,27 +239,32 @@ class Last_User_Orders_By_Roles
 
     private function export_csv($role)
     {
+        ob_start(); // Start output buffering
+        $data = $this->get_user_data_for_export($role, $paged, $users_per_page);
+        $output = ob_get_clean(); // Get the output and clear the buffer
+
+        if (!empty($output)) {
+            error_log('Unexpected output before CSV: ' . $output);
+        }
+        $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $users_per_page = get_option('user_orders_by_role_users_per_page', 25);
+
+        $data = $this->get_user_data_for_export($role, $paged, $users_per_page);
+
         $filename = 'user_orders_by_role_' . date('YmdHis') . '.csv';
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename=' . $filename);
+        header('Pragma: no-cache');
+        header('Expires: 0');
 
         $output = fopen('php://output', 'w');
 
         // Output the CSV header
         fputcsv($output, array('User', 'Email', 'Last Order Date'));
 
-        $paged = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-        $users_per_page = get_option('user_orders_by_role_users_per_page', 25);
-
-        $users = get_users(array(
-            'role' => $role,
-            'number' => $users_per_page,
-            'paged' => $paged,
-        ));
-
-        foreach ($users as $user) {
-            $last_order_date = $this->get_last_order_date($user->ID);
-            fputcsv($output, array($user->display_name, $user->user_email, $last_order_date));
+        // Output the data
+        foreach ($data as $row) {
+            fputcsv($output, $row);
         }
 
         fclose($output);
